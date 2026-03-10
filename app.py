@@ -1,9 +1,5 @@
-# Lancez : streamlit run app_logs.py
-# Vérifiez que le fichier logs.csv est créé et s’enrichit à chaque utilisation.
-
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
-from gpt4all import GPT4All
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline, AutoModelForCausalLM
 import csv
 import os
 from datetime import datetime
@@ -18,29 +14,33 @@ def save_log(service, input_text, output):
         writer = csv.writer(f)
         if not file_exists:
             writer.writerow(["timestamp", "service", "input", "output"])
-        writer.writerow([datetime.now().isoformat(), service, input_text[:200], output[:200]])  # tronquer pour lisibilité
+        writer.writerow([datetime.now().isoformat(), service, input_text[:200], output[:200]])
 
 @st.cache_resource
 def load_models():
+    # Résumé (T5-small)
     summarizer_tokenizer = AutoTokenizer.from_pretrained("t5-small")
     summarizer_model = AutoModelForSeq2SeqLM.from_pretrained("t5-small")
+    # Sentiment (DistilBERT)
     sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
-    chat_model = GPT4All("orca-mini-3b-gguf2-q4_0.gguf")
-    return summarizer_tokenizer, summarizer_model, sentiment_pipeline, chat_model
+    # Chatbot (DialoGPT-small) - remplace GPT4All
+    chat_tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
+    chat_model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-small")
+    return summarizer_tokenizer, summarizer_model, sentiment_pipeline, chat_tokenizer, chat_model
 
 st.set_page_config(page_title="App IA avec logs", layout="wide")
 st.title("📊 Application IA améliorée (avec logs)")
 
 # Chargement des modèles
 with st.spinner("Chargement des modèles..."):
-    tokenizer, model, sentiment, chat = load_models()
+    tokenizer, model, sentiment, chat_tokenizer, chat_model = load_models()
 st.sidebar.success("Modèles prêts")
 
-# Affichage des logs récents dans la sidebar
+# Affichage des logs récents
 st.sidebar.header("📋 Derniers logs")
 if os.path.exists(LOG_FILE):
     with open(LOG_FILE, "r", encoding='utf-8') as f:
-        lines = f.readlines()[-10:]  # 10 dernières lignes
+        lines = f.readlines()[-10:]
         for line in lines:
             st.sidebar.text(line.strip())
 else:
@@ -56,7 +56,15 @@ if user_input:
     else:
         try:
             with st.spinner("Le chatbot réfléchit..."):
-                response = chat.generate(user_input, max_tokens=200)  # Limiter la longueur
+                inputs = chat_tokenizer.encode(user_input + chat_tokenizer.eos_token, return_tensors='pt')
+                reply_ids = chat_model.generate(
+                    inputs,
+                    max_length=100,
+                    pad_token_id=chat_tokenizer.eos_token_id,
+                    do_sample=True,
+                    temperature=0.7
+                )
+                response = chat_tokenizer.decode(reply_ids[:, inputs.shape[-1]:][0], skip_special_tokens=True)
             st.write("**Réponse :**", response)
             save_log("chat", user_input, response)
         except Exception as e:
