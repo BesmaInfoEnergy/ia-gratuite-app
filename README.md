@@ -73,7 +73,7 @@ FastAPI (utilisé dans les étapes intermédiaires, non requis ici)
 Python 3.10+
 
 Auteur
-Créé par [BesmaInfoEnergy] dans le cadre d'une roadmap d'apprentissage de 7 jours sur les IA génératives.
+Créé par BesmaInfoEnergy dans le cadre d'une roadmap d'apprentissage de 7 jours sur les IA génératives.
 
 Licence
 Ce projet est librement réutilisable à des fins éducatives. Les modèles pré-entraînés appartiennent à leurs auteurs respectifs (licences MIT, Apache 2.0, etc.).
