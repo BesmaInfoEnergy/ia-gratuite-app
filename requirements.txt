@@ -1,0 +1,4 @@
+transformers
+torch
+gpt4all
+streamlit
